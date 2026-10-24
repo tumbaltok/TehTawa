@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.sistem_presensi_operasional_outlet_kappa.twa",
+        "sha256_cert_fingerprints": ["A0:E6:A5:AD:8C:94:A6:F6:C3:16:4B:51:B2:37:17:E6:68:D1:78:23:F2:0B:C7:F9:4C:6F:75:FC:D9:E8:60:C9"]
+      }
+    }]
