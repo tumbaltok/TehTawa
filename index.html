@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Sistem Presensi & Operasional Outlet</title>
+  
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Teh Tawa">
+  <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2921/2921222.png">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2921/2921222.png">
+  <link rel="manifest" href="/manifest.json">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      -webkit-tap-highlight-color: transparent;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .loader-ring {
+      border: 3px solid rgba(255, 255, 255, 0.15);
+      border-top: 3px solid #38bdf8;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    video { transform: scaleX(-1); }
+  </style>
+</head>
+<body class="min-h-screen pb-16 selection:bg-sky-500 selection:text-white">
+
+  <!-- LOADING OVERLAY -->
+  <div id="loadingOverlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="glass-card p-6 rounded-3xl shadow-2xl flex flex-col items-center space-y-3 max-w-xs w-full mx-4 text-center">
+      <div class="loader-ring"></div>
+      <p id="loadingText" class="text-xs font-semibold text-slate-200 tracking-wide">Menghubungkan ke Server Aman...</p>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastBox" class="hidden fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[92%] p-4 rounded-2xl shadow-2xl text-xs font-semibold transition-all duration-300"></div>
+
+  <!-- CONTAINER UTAMA MOBILE-FIRST -->
+  <div class="max-w-md mx-auto min-h-screen flex flex-col px-4 pt-4">
+
+    <!-- ================= VIEW 1: LAYAR LOGIN (NAMA + PIN) ================= -->
+    <div id="loginView" class="hidden my-auto py-8">
+      <div class="glass-card p-6 rounded-3xl shadow-2xl space-y-5 border border-sky-500/20">
+        <div class="flex items-center space-x-3">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/30 font-extrabold text-xl">
+            🛡️
+          </div>
+          <div>
+            <h1 class="text-base font-extrabold text-white">Autentikasi Outlet</h1>
+            <p class="text-xs text-slate-400">Masuk dengan Nama & PIN Keamanan</p>
+          </div>
+        </div>
+
+        <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Nama Karyawan / Username</label>
+            <input type="text" id="loginNameInput" required autocomplete="username" placeholder="Ketik nama Anda (Misal: Budi)"
+              class="w-full px-4 py-3 text-sm bg-slate-900/90 border border-slate-700 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 font-semibold" />
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">PIN Keamanan (Default: 123456)</label>
+            <input type="password" id="loginPinInput" required autocomplete="current-password" placeholder="••••••" inputmode="numeric"
+              class="w-full px-4 py-3 text-sm bg-slate-900/90 border border-slate-700 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 tracking-widest font-mono" />
+          </div>
+
+          <button type="submit" class="w-full bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold py-3.5 rounded-2xl text-sm shadow-lg shadow-sky-500/25 transition">
+            Masuk Sekarang
+          </button>
+        </form>
+
+        <div class="p-3 rounded-2xl bg-slate-900/70 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+          🔒 <strong>Proteksi Anti-Titip Absen:</strong> Setiap sesi diikat dengan tanda tangan kriptografi HMAC-SHA256 pada perangkat Anda.
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= VIEW 2: APLIKASI UTAMA ================= -->
+    <div id="appView" class="hidden space-y-4 flex-1 flex flex-col">
+
+      <!-- HEADER PROFIL & JAM SERVER -->
+      <header class="glass-card p-4 rounded-3xl shadow-xl border border-slate-800">
+        <div class="flex justify-between items-start">
+          <div class="flex items-center space-x-3">
+            <div id="avatarInitial" class="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-700 flex items-center justify-center font-extrabold text-sm shadow-md">
+              U
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <h2 id="headerUserName" class="text-sm font-extrabold text-white truncate max-w-[160px]">...</h2>
+                <span id="headerRoleBadge" class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md">...</span>
+              </div>
+              <p id="headerUserId" class="text-[11px] text-slate-400 font-mono">...</p>
+            </div>
+          </div>
+
+          <div class="text-right">
+            <div id="headerClock" class="text-xs font-mono font-bold text-sky-400 bg-sky-950/60 border border-sky-800/50 px-2.5 py-1 rounded-xl">
+              --:-- WIB
+            </div>
+            <div class="mt-1.5 flex justify-end space-x-2">
+              <button onclick="openPinModal()" class="text-[10px] text-slate-400 hover:text-white underline">Ubah PIN</button>
+              <button onclick="handleLogout()" class="text-[10px] text-rose-400 hover:text-rose-300 font-bold">Keluar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- BAR TELEMETRI GPS REAL-TIME -->
+        <div class="mt-3.5 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <div class="flex items-center space-x-2 min-w-0">
+            <span id="gpsDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0"></span>
+            <span id="gpsText" class="text-[11px] text-slate-300 font-medium truncate">Memindai satelit GPS...</span>
+          </div>
+          <button onclick="refreshGps()" class="shrink-0 ml-2 bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 px-2.5 py-1 rounded-xl text-[11px] font-bold transition">
+            Segarkan GPS
+          </button>
+        </div>
+      </header>
+
+      <!-- CONTAINER NAVIGASI TAB ADMIN -->
+      <div id="dynamicAdminNav"></div>
+
+      <!-- ================= TAB OPERASIONAL ================= -->
+      <div id="tabOperasional" class="space-y-4">
+
+        <!-- KARTU MONITOR SLOT SHIFT AKTIF (MAKS 2 PETUGAS) -->
+        <section class="glass-card p-4 rounded-3xl space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Kuota Shift Aktif</h3>
+              <p class="text-[11px] text-slate-400">Maksimal 2 petugas aktif bersamaan</p>
+            </div>
+            <span id="slotCounterBadge" class="text-xs font-extrabold px-3 py-1 rounded-xl">...</span>
+          </div>
+
+          <div id="activeShiftCards" class="space-y-2.5"></div>
+        </section>
+
+        <!-- KARTU FORM CHECK-IN (KAMERA REAL-TIME + WATERMARK) -->
+        <section id="checkInCard" class="glass-card p-4 rounded-3xl space-y-3.5">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-sm font-extrabold text-white">Presensi Masuk Shift</h3>
+              <p class="text-[11px] text-slate-400">Verifikasi Geolocation & Live Selfie Watermark</p>
+            </div>
+            <span class="text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2.5 py-1 rounded-lg">
+              Anti-Spoofing
+            </span>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">Petugas yang Masuk</label>
+            <select id="selectCheckInEmp" class="w-full p-3 text-xs font-semibold bg-slate-900 border border-slate-700 rounded-2xl text-white focus:outline-none focus:border-sky-500"></select>
+          </div>
+
+          <!-- VIEWPORT KAMERA -->
+          <div class="space-y-2">
+            <div class="relative bg-slate-950 rounded-2xl overflow-hidden aspect-4/3 border border-slate-800 flex items-center justify-center">
+              <video id="liveVideo" autoplay playsinline muted class="hidden w-full h-full object-cover"></video>
+              <img id="capturedImagePreview" class="hidden w-full h-full object-cover" alt="Selfie Watermark" />
+
+              <div id="cameraStartOverlay" class="text-center p-5">
+                <div class="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto mb-2 text-xl">📷</div>
+                <p class="text-xs font-semibold text-slate-300">Kamera Depan Wajib Real-Time</p>
+                <p class="text-[10px] text-slate-500 mt-0.5 mb-3">Tanpa opsi unggah galeri. Otomatis mencetak koordinat & jam.</p>
+                <button type="button" onclick="startFrontCamera()" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-sky-500/20 transition">
+                  Aktifkan Kamera Selfie
+                </button>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <button type="button" id="btnSnapPhoto" onclick="takeWatermarkedSnapshot()" class="hidden flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs py-2.5 rounded-xl transition">
+                Jepret Foto + Watermark
+              </button>
+              <button type="button" id="btnRetakePhoto" onclick="startFrontCamera()" class="hidden flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs py-2.5 rounded-xl transition">
+                Ulangi Foto
+              </button>
+            </div>
+          </div>
+
+          <button type="button" id="btnSubmitCheckIn" onclick="submitCheckInRequest()" class="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 text-white font-extrabold py-3.5 rounded-2xl text-xs shadow-lg shadow-sky-500/20 transition">
+            Kirim Presensi Masuk Sekarang
+          </button>
+        </section>
+
+        <!-- KARTU TUTUP OUTLET & INPUT OMSET (JAM >= 21:00 WIB) -->
+        <section class="glass-card p-4 rounded-3xl space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-sm font-extrabold text-white">Input Omset & Tutup Shift 2</h3>
+              <p class="text-[11px] text-slate-400">Aktif >= 21.00 WIB • Bonus Rp5.000 / kelipatan 1 Juta</p>
+            </div>
+            <span id="omsetBadge" class="text-[10px] font-extrabold px-2.5 py-1 rounded-lg">...</span>
+          </div>
+
+          <div id="omsetSummaryCard" class="hidden p-3.5 rounded-2xl bg-emerald-950/50 border border-emerald-700/40 text-xs text-emerald-200 space-y-1"></div>
+
+          <button type="button" id="btnTriggerOmsetModal" onclick="openOmsetModal()" disabled
+            class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 text-white font-extrabold py-3 rounded-2xl text-xs transition">
+            Menunggu Pukul 21:00 WIB...
+          </button>
+        </section>
+
+        <!-- KARTU RIWAYAT HARI INI & TRANSPARANSI GAJI -->
+        <section class="glass-card p-4 rounded-3xl space-y-3">
+          <div class="flex justify-between items-center">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Log Presensi & Estimasi Upah Hari Ini</h3>
+            <span class="text-[10px] text-slate-400">Rate: Rp5rb/jam</span>
+          </div>
+          <div id="todayHistoryContainer" class="space-y-2.5 text-xs"></div>
+        </section>
+
+      </div>
+
+      <!-- ================= TAB ADMIN ================= -->
+      <div id="tabAdmin" class="hidden space-y-4"></div>
+
+    </div>
+  </div>
+
+  <!-- MODAL INPUT OMSET (JAM >= 21:00) -->
+  <div id="omsetModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="glass-card w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4 border border-indigo-500/30 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-sm font-extrabold text-white">Laporan Omset Harian (Shift 2)</h3>
+          <p class="text-[11px] text-slate-400">Otomatis Checkout seluruh petugas yang masih aktif</p>
+        </div>
+        <button onclick="closeOmsetModal()" class="text-slate-400 hover:text-white font-bold text-xl">&times;</button>
+      </div>
+
+      <div class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">Total Omset Hari Ini (Rp)</label>
+          <input type="number" id="omsetAmountInput" min="0" placeholder="Contoh: 3250000" oninput="updateOmsetBonusPreview()"
+            class="w-full p-3 text-sm bg-slate-900 border border-slate-700 rounded-2xl text-white font-bold focus:outline-none focus:border-indigo-500" />
+          <p id="omsetBonusPreview" class="text-xs text-indigo-400 font-bold mt-1.5">Bonus Tiap Karyawan: Rp0</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">Foto Struk / Rekap Kasir (Kamera Langsung)</label>
+          <input type="file" id="omsetCameraInput" accept="image/*" capture="environment" onchange="processOmsetImage(event)"
+            class="w-full text-xs text-slate-300 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-indigo-500/20 file:text-indigo-300" />
+          <img id="omsetImagePreview" class="hidden mt-2.5 w-full h-40 object-cover rounded-2xl border border-slate-700" alt="Preview Struk" />
+        </div>
+
+        <button type="button" onclick="submitOmsetRequest()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-extrabold py-3.5 rounded-2xl text-xs shadow-lg">
+          Simpan Omset & Checkout Semua Petugas
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL UBAH PIN PRIBADI -->
+  <div id="pinModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-xs rounded-3xl p-5 space-y-4 border border-slate-700">
+      <div class="flex justify-between items-center">
+        <h3 class="text-sm font-extrabold text-white">Ubah PIN Keamanan</h3>
+        <button onclick="closePinModal()" class="text-slate-400 hover:text-white font-bold">&times;</button>
+      </div>
+      <div class="space-y-3">
+        <input type="password" id="oldPinInput" inputmode="numeric" placeholder="PIN Lama" class="w-full p-2.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white" />
+        <input type="password" id="newPinInput" inputmode="numeric" placeholder="PIN Baru (Min. 4 karakter)" class="w-full p-2.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white" />
+        <button onclick="submitNewPin()" class="w-full bg-sky-500 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs">Simpan PIN Baru</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="watermarkCanvas" class="hidden"></canvas>
+
+  <script>
+    /**
+     * ========================================================================
+     * KONFIGURASI HYBRID (GOOGLE APPS SCRIPT + STANDALONE APK / PWA)
+     * Jika file HTML ini di-hosting di luar Google Script (misal di Vercel atau
+     * dibungkus langsung ke APK), isi GAS_WEB_APP_URL dengan URL /exec Anda.
+     * ========================================================================
+     */
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby-Fm61fQh0J3R1n85zyk4bPNZxXklG6Y2dTrdJcH1V4G4Yt7AMQJl9ztvjnKDw1-i6iw/exec';
+    const TOKEN_STORAGE_KEY = 'OUTLET_SECURE_SESSION_TOKEN_V3';
+    const SAVED_NAME_KEY = 'OUTLET_LAST_USERNAME_V3';
+
+    let state = null;
+    let gps = { lat: null, lng: null, accuracy: null };
+    let selfieBase64 = null;
+    let omsetBase64 = null;
+    let mediaStream = null;
+
+    /**
+     * Universal Server Caller: Otomatis memakai google.script.run jika di dalam GAS,
+     * atau memakai fetch POST jika dijalankan sebagai APK / PWA mandiri.
+     */
+    function callServer(action, payload, onSuccess, onFailure) {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        const runner = google.script.run
+          .withSuccessHandler(onSuccess)
+          .withFailureHandler(onFailure);
+
+        if (action === 'getInitialState') runner.getInitialState(payload.sessionToken);
+        else if (action === 'loginWithNameAndPin') runner.loginWithNameAndPin(payload.nama, payload.pin);
+        else if (action === 'changeMyPin') runner.changeMyPin(payload.sessionToken, payload.oldPin, payload.newPin);
+        else runner[action](payload);
+      } else {
+        if (!GAS_WEB_APP_URL) {
+          onFailure({ message: 'URL Server (GAS_WEB_APP_URL) belum diisi pada kode index.html!' });
+          return;
+        }
+        fetch(GAS_WEB_APP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: action, payload: payload })
+        })
+          .then(r => r.json())
+          .then(res => {
+            if (res.ok) onSuccess(res.data);
+            else onFailure({ message: res.error || 'Terjadi kesalahan pada server.' });
+          })
+          .catch(err => onFailure({ message: 'Gagal terhubung ke koneksi internet / server: ' + err.message }));
+      }
+    }
+    
+    window.addEventListener('DOMContentLoaded', () => {
+      const lastUser = localStorage.getItem(SAVED_NAME_KEY);
+      if (lastUser) {
+        document.getElementById('loginNameInput').value = lastUser;
+      }
+      refreshGps();
+      syncStateWithServer();
+      setInterval(tickLocalClock, 15000);
+    });
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+
+    function setLoading(show, text = 'Memproses...') {
+      document.getElementById('loadingText').innerText = text;
+      document.getElementById('loadingOverlay').classList.toggle('hidden', !show);
+    }
+
+    function showToast(msg, type = 'info') {
+      const box = document.getElementById('toastBox');
+      box.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[92%] p-4 rounded-2xl shadow-2xl text-xs font-bold ';
+      if (type === 'error') {
+        box.classList.add('bg-rose-950/95', 'text-rose-200', 'border', 'border-rose-600/50');
+      } else if (type === 'success') {
+        box.classList.add('bg-emerald-950/95', 'text-emerald-200', 'border', 'border-emerald-500/50');
+      } else {
+        box.classList.add('bg-slate-900/95', 'text-sky-300', 'border', 'border-sky-500/40');
+      }
+      box.innerText = msg;
+      box.classList.remove('hidden');
+      setTimeout(() => box.classList.add('hidden'), 6500);
+    }
+
+    /**
+     * 1. GEOLOCATION & HAVERSINE PREVIEW
+     */
+    function refreshGps() {
+      const dot = document.getElementById('gpsDot');
+      const txt = document.getElementById('gpsText');
+      if (dot && txt) {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0';
+        txt.innerText = 'Mengunci titik koordinat GPS...';
+      }
+
+      if (!navigator.geolocation) {
+        if (txt) txt.innerText = 'Perangkat tidak mendukung Geolocation!';
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          gps.lat = pos.coords.latitude;
+          gps.lng = pos.coords.longitude;
+          gps.accuracy = Math.round(pos.coords.accuracy);
+          renderGpsBar();
+        },
+        (err) => {
+          if (dot && txt) {
+            dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0';
+            txt.innerText = 'Izin lokasi GPS ditolak / belum aktif!';
+          }
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    }
+
+    function renderGpsBar() {
+      const dot = document.getElementById('gpsDot');
+      const txt = document.getElementById('gpsText');
+      if (!gps.lat || !state || !state.settings) return;
+
+      const dist = Math.round(calcHaversine(gps.lat, gps.lng, state.settings.latOutlet, state.settings.longOutlet));
+      const maxR = state.settings.radiusMeter;
+
+      if (dist <= maxR) {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0';
+        txt.innerText = `Radius Aman: ${dist}m dari Outlet (Maks ${maxR}m • Akurasi ±${gps.accuracy}m)`;
+      } else {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0';
+        txt.innerText = `Di Luar Outlet: ${dist}m (Batas ${maxR}m • Akurasi ±${gps.accuracy}m)`;
+      }
+    }
+
+    function calcHaversine(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = d => (d * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    /**
+     * 2. SINKRONISASI STATE & LOGIN NAMA + PIN
+     */
+    function syncStateWithServer() {
+      setLoading(true, 'Memverifikasi tanda tangan sesi...');
+      const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY) || '';
+
+      callServer(
+        'getInitialState',
+        { sessionToken: savedToken },
+        (res) => {
+          setLoading(false);
+          handleServerStateResponse(res);
+        },
+        (err) => {
+          setLoading(false);
+          showToast(err.message || 'Gagal memuat sistem', 'error');
+        }
+      );
+    }
+
+    function handleServerStateResponse(res) {
+      state = res;
+      if (res.requireLogin) {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        document.getElementById('appView').classList.add('hidden');
+        document.getElementById('loginView').classList.remove('hidden');
+        return;
+      }
+
+      if (res.sessionToken) {
+        localStorage.setItem(TOKEN_STORAGE_KEY, res.sessionToken);
+      }
+      if (res.user && res.user.nama) {
+        localStorage.setItem(SAVED_NAME_KEY, res.user.nama);
+      }
+
+      document.getElementById('loginView').classList.add('hidden');
+      document.getElementById('appView').classList.remove('hidden');
+
+      // Render Profil Header
+      document.getElementById('avatarInitial').innerText = state.user.nama.charAt(0).toUpperCase();
+      document.getElementById('headerUserName').innerText = state.user.nama;
+      document.getElementById('headerUserId').innerText = `ID Petugas: ${state.user.id}`;
+      document.getElementById('headerClock').innerText = `${state.serverTime.time} WIB`;
+
+      const roleBadge = document.getElementById('headerRoleBadge');
+      if (state.user.role === 'Admin') {
+        roleBadge.innerText = 'ADMIN';
+        roleBadge.className = 'text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30';
+      } else {
+        roleBadge.innerText = 'PETUGAS';
+        roleBadge.className = 'text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/30';
+      }
+
+      renderGpsBar();
+      renderActiveSlots();
+      renderCheckInDropdown();
+      renderOmsetStatus();
+      renderHistoryList();
+      renderZeroTrustAdminDOM();
+    }
+
+    function handleLoginSubmit(e) {
+      e.preventDefault();
+      const nama = document.getElementById('loginNameInput').value.trim();
+      const pin = document.getElementById('loginPinInput').value.trim();
+
+      setLoading(true, 'Memverifikasi Nama & PIN di Server...');
+      callServer(
+        'loginWithNameAndPin',
+        { nama: nama, pin: pin },
+        (res) => {
+          setLoading(false);
+          document.getElementById('loginPinInput').value = '';
+          showToast(`Selamat datang, ${res.user.nama}!`, 'success');
+          handleServerStateResponse(res);
+        },
+        (err) => {
+          setLoading(false);
+          showToast(err.message, 'error');
+        }
+      );
+    }
+
+    function handleLogout() {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      stopCameraStream();
+      state = null;
+      document.getElementById('tabAdmin').innerHTML = '';
+      document.getElementById('dynamicAdminNav').innerHTML = '';
+      document.getElementById('appView').classList.add('hidden');
+      document.getElementById('loginView').classList.remove('hidden');
+      showToast('Anda telah keluar dari sesi.', 'info');
+    }
+
+    /**
+     * 3. RENDER SLOT AKTIF, CHECK-IN, DAN OMSET
+     */
+    function renderActiveSlots() {
+      const { emptySlot, activeShifts } = state.slotInfo;
+      const badge = document.getElementById('slotCounterBadge');
+      badge.innerText = `Slot Tersedia: ${emptySlot} / 2`;
+      badge.className = emptySlot > 0
+        ? 'text-xs font-extrabold px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+        : 'text-xs font-extrabold px-3 py-1 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30';
+
+      const container = document.getElementById('activeShiftCards');
+      container.innerHTML = '';
+
+      if (activeShifts.length === 0) {
+        container.innerHTML = `
+          <div class="p-4 rounded-2xl bg-slate-900/60 border border-dashed border-slate-700 text-center text-xs text-slate-400">
+            Outlet sedang kosong (Belum ada petugas yang Check-In).
+          </div>`;
+        return;
+      }
+
+      activeShifts.forEach((shift, i) => {
+        const isOwnerOrAdmin = state.user.role === 'Admin' || shift.idKaryawan === state.user.id;
+        const div = document.createElement('div');
+        div.className = 'p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 flex items-center justify-between';
+        div.innerHTML = `
+          <div class="flex items-center space-x-3">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <div>
+              <div class="text-xs font-extrabold text-white">Petugas #${i + 1}: ${shift.nama}</div>
+              <div class="text-[11px] text-slate-400">Masuk: <strong class="text-sky-300">${shift.jamMasuk} WIB</strong></div>
+            </div>
+          </div>
+          ${isOwnerOrAdmin ? `
+            <button onclick="submitCheckOutRequest('${shift.idPresensi}', '${shift.nama}')"
+              class="bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold px-3.5 py-2 rounded-xl shadow-md transition">
+              Pulang (Checkout)
+            </button>
+          ` : `<span class="text-[10px] font-bold text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-lg">Bertugas</span>`}
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function renderCheckInDropdown() {
+      const sel = document.getElementById('selectCheckInEmp');
+      const btn = document.getElementById('btnSubmitCheckIn');
+
+      if (state.slotInfo.emptySlot === 0) {
+        sel.innerHTML = `<option value="">-- KUOTA PENUH (2 PETUGAS AKTIF) --</option>`;
+        sel.disabled = true;
+        btn.disabled = true;
+        return;
+      }
+
+      if (state.availableEmployees.length === 0) {
+        sel.innerHTML = `<option value="">-- Anda sedang bertugas aktif saat ini --</option>`;
+        sel.disabled = true;
+        btn.disabled = true;
+        return;
+      }
+
+      sel.disabled = false;
+      btn.disabled = false;
+      sel.innerHTML = '';
+
+      state.availableEmployees.forEach(emp => {
+        const opt = document.createElement('option');
+        opt.value = emp.id;
+        opt.textContent = `${emp.nama} (${emp.id})`;
+        if (emp.id === state.user.id) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function renderOmsetStatus() {
+      const badge = document.getElementById('omsetBadge');
+      const summary = document.getElementById('omsetSummaryCard');
+      const btn = document.getElementById('btnTriggerOmsetModal');
+
+      if (state.omsetToday) {
+        badge.innerText = 'SELESAI';
+        badge.className = 'text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300';
+        summary.classList.remove('hidden');
+        summary.innerHTML = `
+          <div>💰 <strong>Total Omset:</strong> Rp${Number(state.omsetToday.totalOmset).toLocaleString('id-ID')}</div>
+          <div>🎁 <strong>Bonus / Karyawan:</strong> Rp${Number(state.omsetToday.bonusPerKaryawan).toLocaleString('id-ID')}</div>
+          <div>🕒 <strong>Diinput Pukul:</strong> ${state.omsetToday.jamInput} WIB (Oleh: ${state.omsetToday.diinputOleh})</div>
+        `;
+        btn.disabled = true;
+        btn.innerText = 'Laporan Omset Hari Ini Telah Ditutup';
+        return;
+      }
+
+      summary.classList.add('hidden');
+      if (state.serverTime.hour >= 21) {
+        badge.innerText = 'DIBUKA';
+        badge.className = 'text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300';
+        btn.disabled = false;
+        btn.innerText = 'Input Omset Harian & Auto-Checkout Massal';
+      } else {
+        badge.innerText = 'TERKUNCI (< 21:00)';
+        badge.className = 'text-[10px] font-extrabold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400';
+        btn.disabled = true;
+        btn.innerText = 'Terkunci — Dibuka Pukul 21:00 WIB';
+      }
+    }
+
+    function renderHistoryList() {
+      const container = document.getElementById('todayHistoryContainer');
+      container.innerHTML = '';
+
+      if (!state.todayHistory || state.todayHistory.length === 0) {
+        container.innerHTML = `<p class="text-slate-500 text-center py-3">Belum ada aktivitas shift hari ini.</p>`;
+        return;
+      }
+
+      const bonus = state.omsetToday ? Number(state.omsetToday.bonusPerKaryawan) : 0;
+
+      state.todayHistory.forEach(h => {
+        const div = document.createElement('div');
+        div.className = 'p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1.5';
+        div.innerHTML = `
+          <div class="flex justify-between items-center">
+            <span class="font-extrabold text-white">${h.nama}</span>
+            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md ${h.statusSelesai ? 'bg-slate-800 text-slate-300' : 'bg-emerald-500/20 text-emerald-300'}">
+              ${h.statusSelesai ? 'Selesai' : 'Sedang Bertugas'}
+            </span>
+          </div>
+          <div class="text-[11px] text-slate-400 flex justify-between">
+            <span>Waktu: ${h.jamMasuk} - ${h.jamPulang || 'Aktif'}</span>
+            <span>Durasi: <strong>${h.durasiMenit} mnt</strong> ${h.lemburJam > 0 ? `(Lembur ${h.lemburJam}j)` : ''}</span>
+          </div>
+          ${h.statusSelesai ? `
+            <div class="pt-2 border-t border-slate-800 flex justify-between items-center text-[11px]">
+              <span class="text-slate-400">Pokok Rp${h.gajiPokok.toLocaleString('id-ID')} + Lembur Rp${h.uangLembur.toLocaleString('id-ID')} ${h.insentifFullTime > 0 ? `+ FullTime Rp${h.insentifFullTime.toLocaleString('id-ID')}` : ''}</span>
+              <span class="font-extrabold text-sky-400">Total: Rp${(h.totalUpah + bonus).toLocaleString('id-ID')}</span>
+            </div>
+          ` : ''}
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    /**
+     * 4. KAMERA LIVE STREAM + WATERMARK ANTI-CHEAT
+     */
+    async function startFrontCamera() {
+      selfieBase64 = null;
+      const video = document.getElementById('liveVideo');
+      const img = document.getElementById('capturedImagePreview');
+      const overlay = document.getElementById('cameraStartOverlay');
+      const btnSnap = document.getElementById('btnSnapPhoto');
+      const btnRetake = document.getElementById('btnRetakePhoto');
+
+      img.classList.add('hidden');
+      btnRetake.classList.add('hidden');
+
+      try {
+        stopCameraStream();
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false
+        });
+        video.srcObject = mediaStream;
+        video.classList.remove('hidden');
+        overlay.classList.add('hidden');
+        btnSnap.classList.remove('hidden');
+      } catch (e) {
+        showToast('Gagal membuka kamera depan! Pastikan izin kamera telah diberikan pada aplikasi/browser.', 'error');
+      }
+    }
+
+    function stopCameraStream() {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+    }
+
+    function takeWatermarkedSnapshot() {
+      if (!gps.lat || !gps.lng) {
+        showToast('Tunggu GPS terkunci sebelum mengambil foto!', 'error');
+        return;
+      }
+
+      const video = document.getElementById('liveVideo');
+      const img = document.getElementById('capturedImagePreview');
+      const canvas = document.getElementById('watermarkCanvas');
+      const btnSnap = document.getElementById('btnSnapPhoto');
+      const btnRetake = document.getElementById('btnRetakePhoto');
+
+      canvas.width = 540;
+      canvas.height = 405;
+      const ctx = canvas.getContext('2d');
+
+      ctx.save();
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+      ctx.fillRect(0, canvas.height - 68, canvas.width, 68);
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(`VERIFIED LIVE SELFIE • ${state.user.nama} (${state.user.id})`, 14, canvas.height - 44);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '11px monospace';
+      const nowStamp = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+      ctx.fillText(`Waktu: ${nowStamp} WIB`, 14, canvas.height - 26);
+      ctx.fillText(`GPS  : ${gps.lat.toFixed(6)}, ${gps.lng.toFixed(6)} (±${gps.accuracy}m)`, 14, canvas.height - 10);
+
+      selfieBase64 = canvas.toDataURL('image/jpeg', 0.8);
+      stopCameraStream();
+
+      video.classList.add('hidden');
+      img.src = selfieBase64;
+      img.classList.remove('hidden');
+      btnSnap.classList.add('hidden');
+      btnRetake.classList.remove('hidden');
+    }
+
+    /**
+     * 5. SUBMIT CHECK-IN, CHECK-OUT, DAN OMSET
+     */
+    function submitCheckInRequest() {
+      const empId = document.getElementById('selectCheckInEmp').value;
+      if (!empId) return showToast('Pilih nama petugas terlebih dahulu.', 'error');
+      if (!gps.lat || !gps.lng) return showToast('Koordinat GPS belum siap. Klik Segarkan GPS.', 'error');
+      if (!selfieBase64) return showToast('Wajib mengambil foto selfie langsung terlebih dahulu!', 'error');
+
+      setLoading(true, 'Memvalidasi jarak Haversine & mengunggah foto...');
+      callServer(
+        'submitCheckIn',
+        {
+          sessionToken: localStorage.getItem(TOKEN_STORAGE_KEY),
+          idKaryawan: empId,
+          lat: gps.lat,
+          lng: gps.lng,
+          accuracy: gps.accuracy,
+          fotoBase64: selfieBase64
+        },
+        (res) => {
+          showToast(res.message, 'success');
+          selfieBase64 = null;
+          document.getElementById('capturedImagePreview').classList.add('hidden');
+          document.getElementById('cameraStartOverlay').classList.remove('hidden');
+          document.getElementById('btnRetakePhoto').classList.add('hidden');
+          syncStateWithServer();
+        },
+        (err) => {
+          setLoading(false);
+          showToast(err.message, 'error');
+        }
+      );
+    }
+
+    function submitCheckOutRequest(idPresensi, nama) {
+      if (!gps.lat || !gps.lng) return showToast('Tunggu titik GPS siap sebelum Checkout!', 'error');
+      if (!confirm(`Konfirmasi Checkout (Pulang) untuk ${nama}?`)) return;
+
+      setLoading(true, 'Memproses Checkout & mengosongkan slot...');
+      callServer(
+        'submitCheckOut',
+        {
+          sessionToken: localStorage.getItem(TOKEN_STORAGE_KEY),
+          idPresensi: idPresensi,
+          lat: gps.lat,
+          lng: gps.lng
+        },
+        (res) => {
+          showToast(res.message, 'success');
+          syncStateWithServer();
+        },
+        (err) => {
+          setLoading(false);
+          showToast(err.message, 'error');
+        }
+      );
+    }
+
+    function openOmsetModal() {
+      if (state.serverTime.hour < 21) return showToast('Belum pukul 21:00 WIB!', 'error');
+      document.getElementById('omsetModal').classList.remove('hidden');
+    }
+
+    function closeOmsetModal() {
+      document.getElementById('omsetModal').classList.add('hidden');
+    }
+
+    function updateOmsetBonusPreview() {
+      const val = parseFloat(document.getElementById('omsetAmountInput').value || 0);
+      const bonus = Math.floor(val / 1000000) * 5000;
+      document.getElementById('omsetBonusPreview').innerText = `Bonus Tiap Karyawan: Rp${bonus.toLocaleString('id-ID')}`;
+    }
+
+    function processOmsetImage(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.getElementById('watermarkCanvas');
+          const scale = Math.min(1, 800 / img.width);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          omsetBase64 = canvas.toDataURL('image/jpeg', 0.78);
+          const prev = document.getElementById('omsetImagePreview');
+          prev.src = omsetBase64;
+          prev.classList.remove('hidden');
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function submitOmsetRequest() {
+      const amount = document.getElementById('omsetAmountInput').value;
+      if (!amount || Number(amount) <= 0) return showToast('Masukkan nominal omset yang valid!', 'error');
+      if (!omsetBase64) return showToast('Wajib melampirkan foto struk/rekap omset!', 'error');
+
+      setLoading(true, 'Menyimpan Omset & melakukan Auto-Checkout massal...');
+      callServer(
+        'submitOmsetHarian',
+        {
+          sessionToken: localStorage.getItem(TOKEN_STORAGE_KEY),
+          totalOmset: amount,
+          fotoBase64: omsetBase64,
+          lat: gps.lat,
+          lng: gps.lng
+        },
+        (res) => {
+          closeOmsetModal();
+          showToast(res.message, 'success');
+          syncStateWithServer();
+        },
+        (err) => {
+          setLoading(false);
+          showToast(err.message, 'error');
+        }
+      );
+    }
+
+    /**
+     * 6. ZERO-TRUST ADMIN PANEL RENDERER (TANPA EMAIL)
+     */
+    function renderZeroTrustAdminDOM() {
+      const navContainer = document.getElementById('dynamicAdminNav');
+      const adminContainer = document.getElementById('tabAdmin');
+
+      if (state.user.role !== 'Admin' || !state.adminData) {
+        navContainer.innerHTML = '';
+        adminContainer.innerHTML = '';
+        adminContainer.classList.add('hidden');
+        document.getElementById('tabOperasional').classList.remove('hidden');
+        return;
+      }
+
+      navContainer.innerHTML = `
+        <div class="grid grid-cols-2 gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
+          <button id="navBtnOp" onclick="switchViewTab('op')" class="py-2.5 text-xs font-extrabold rounded-xl bg-sky-500 text-slate-950 shadow-md transition">
+            Operasional Outlet
+          </button>
+          <button id="navBtnAdm" onclick="switchViewTab('adm')" class="py-2.5 text-xs font-extrabold rounded-xl text-slate-400 hover:text-white transition">
+            🛡️ Panel Admin
+          </button>
+        </div>
+      `;
+
+      const empRows = state.adminData.allEmployees.map(emp => `
+        <div class="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 flex justify-between items-center">
+          <div>
+            <div class="text-xs font-extrabold text-white">${emp.nama} <span class="text-[10px] font-mono text-sky-400">(${emp.id})</span></div>
+            <div class="text-[10px] mt-1">
+              <span class="font-bold ${emp.role === 'Admin' ? 'text-amber-400' : 'text-sky-400'}">${emp.role}</span> •
+              <span>PIN: <code class="bg-slate-800 px-1.5 py-0.5 rounded">${emp.pin}</code></span> •
+              <span class="${emp.aktif ? 'text-emerald-400' : 'text-rose-400'}">${emp.aktif ? 'Aktif' : 'Non-Aktif'}</span>
+            </div>
+          </div>
+          <div class="flex space-x-1.5">
+            <button onclick='fillEditEmp(${JSON.stringify(emp)})' class="px-2.5 py-1.5 bg-sky-500/20 text-sky-300 rounded-xl text-[11px] font-bold">Edit</button>
+            <button onclick="deleteEmpRequest('${emp.id}')" class="px-2.5 py-1.5 bg-rose-500/20 text-rose-300 rounded-xl text-[11px] font-bold">Hapus</button>
+          </div>
+        </div>
+      `).join('');
+
+      const logRows = state.adminData.securityLogs.map(l => `
+        <div class="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 text-[11px]">
+          <div class="flex justify-between font-mono text-[10px] text-slate-400">
+            <span>${l.waktu}</span>
+            <span class="font-bold ${l.status.includes('SUCCESS') ? 'text-emerald-400' : 'text-rose-400'}">${l.aksi} [${l.status}]</span>
+          </div>
+          <div class="text-slate-200 font-semibold mt-0.5">${l.nama} — <span class="text-slate-400 font-normal">${l.detail}</span></div>
+        </div>
+      `).join('');
+
+      adminContainer.innerHTML = `
+        <!-- KALIBRASI GPS -->
+        <section class="glass-card p-4 rounded-3xl space-y-3 border border-amber-500/20">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-sm font-extrabold text-white">Kalibrasi Titik GPS Outlet</h3>
+              <p class="text-[11px] text-slate-400">Kunci koordinat outlet ke posisi HP Admin saat ini</p>
+            </div>
+            ${state.spreadsheetUrl ? `<a href="${state.spreadsheetUrl}" target="_blank" class="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-lg">Buka Sheet DB ↗</a>` : ''}
+          </div>
+          <div class="p-3 rounded-2xl bg-slate-900 font-mono text-xs text-slate-300 space-y-1">
+            <div>Lat Outlet : <strong class="text-amber-400">${state.settings.latOutlet}</strong></div>
+            <div>Long Outlet: <strong class="text-amber-400">${state.settings.longOutlet}</strong></div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">Radius Toleransi (Meter)</label>
+            <input type="number" id="admRadiusField" value="${state.settings.radiusMeter}" class="w-full p-2.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white font-bold" />
+          </div>
+          <button onclick="calibrateGpsRequest()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold py-3 rounded-2xl text-xs transition">
+            📍 Jadikan Posisi Saya Saat Ini Sebagai Titik Outlet
+          </button>
+        </section>
+
+        <!-- CRUD KARYAWAN & PIN (TANPA EMAIL) -->
+        <section class="glass-card p-4 rounded-3xl space-y-3">
+          <h3 class="text-sm font-extrabold text-white">Manajemen Nama Karyawan & PIN</h3>
+          <form onsubmit="saveEmpRequest(event)" class="space-y-2.5 bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800">
+            <input type="hidden" id="admEmpId" />
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nama Panggilan / Lengkap (Digunakan untuk Login)</label>
+              <input type="text" id="admEmpName" required placeholder="Contoh: Rina" class="w-full p-2.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white font-semibold" />
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <input type="text" id="admEmpPin" required placeholder="PIN Akses" value="123456" class="p-2.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white font-mono" />
+              <select id="admEmpRole" class="p-2.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white">
+                <option value="User">User</option>
+                <option value="Admin">Admin</option>
+              </select>
+              <select id="admEmpActive" class="p-2.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-white">
+                <option value="true">Aktif</option>
+                <option value="false">Non-Aktif</option>
+              </select>
+            </div>
+            <div class="flex gap-2 pt-1">
+              <button type="submit" class="flex-1 bg-sky-500 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs">Simpan Karyawan</button>
+              <button type="button" onclick="resetAdmForm()" class="px-3 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold">Batal</button>
+            </div>
+          </form>
+          <div class="space-y-2 max-h-80 overflow-y-auto pr-1">${empRows}</div>
+        </section>
+
+        <!-- AUDIT LOG KEAMANAN -->
+        <section class="glass-card p-4 rounded-3xl space-y-2.5">
+          <h3 class="text-xs font-extrabold uppercase tracking-wider text-rose-400">🛡️ Log Audit Keamanan (Anti-Cheat)</h3>
+          <div class="space-y-2 max-h-64 overflow-y-auto pr-1">${logRows || '<p class="text-xs text-slate-500">Belum ada log.</p>'}</div>
+        </section>
+      `;
+    }
+
+    function switchViewTab(tab) {
+      const op = document.getElementById('tabOperasional');
+      const adm = document.getElementById('tabAdmin');
+      const bOp = document.getElementById('navBtnOp');
+      const bAdm = document.getElementById('navBtnAdm');
+
+      if (tab === 'adm' && state.user.role === 'Admin') {
+        op.classList.add('hidden');
+        adm.classList.remove('hidden');
+        bAdm.className = 'py-2.5 text-xs font-extrabold rounded-xl bg-amber-500 text-slate-950 shadow-md transition';
+        bOp.className = 'py-2.5 text-xs font-extrabold rounded-xl text-slate-400 hover:text-white transition';
+      } else {
+        adm.classList.add('hidden');
+        op.classList.remove('hidden');
+        bOp.className = 'py-2.5 text-xs font-extrabold rounded-xl bg-sky-500 text-slate-950 shadow-md transition';
+        if (bAdm) bAdm.className = 'py-2.5 text-xs font-extrabold rounded-xl text-slate-400 hover:text-white transition';
+      }
+    }
+
+    function fillEditEmp(emp) {
+      document.getElementById('admEmpId').value = emp.id;
+      document.getElementById('admEmpName').value = emp.nama;
+      document.getElementById('admEmpPin').value = emp.pin;
+      document.getElementById('admEmpRole').value = emp.role;
+      document.getElementById('admEmpActive').value = String(emp.aktif);
+    }
+
+    function resetAdmForm() {
+      document.getElementById('admEmpId').value = '';
+      document.getElementById('admEmpName').value = '';
+      document.getElementById('admEmpPin').value = '123456';
+      document.getElementById('admEmpRole').value = 'User';
+      document.getElementById('admEmpActive').value = 'true';
+    }
+
+    function saveEmpRequest(e) {
+      e.preventDefault();
+      const payload = {
+        sessionToken: localStorage.getItem(TOKEN_STORAGE_KEY),
+        id: document.getElementById('admEmpId').value,
+        nama: document.getElementById('admEmpName').value,
+        pin: document.getElementById('admEmpPin').value,
+        role: document.getElementById('admEmpRole').value,
+        aktif: document.getElementById('admEmpActive').value === 'true'
+      };
+
+      setLoading(true, 'Menyimpan data karyawan...');
+      callServer(
+        'saveEmployeeAdmin',
+        payload,
+        (res) => {
+          showToast(res.message, 'success');
+          syncStateWithServer();
+        },
+        (err) => {
+          setLoading(false);
+          showToast(err.message, 'error');
+        }
+      );
+    }
+
+    function deleteEmpRequest(id) {
+      if (!confirm(`Hapus karyawan ${id}?`)) return;
+      setLoading(true, 'Menghapus karyawan...');
+      callServer(
+        'deleteEmployeeAdmin',
+        {
+          sessionToken: localStorage.getItem(TOKEN_STORAGE_KEY),
+          idKaryawan: id
+        },
+        (res) => {
+          showToast(res.message, 'success');
+          syncStateWithServer();
+        },
+        (err) => {
+          setLoading(false);
+          showToast(err.message, 'error');
+        }
+      );
+    }
+
+    function calibrateGpsRequest() {
+      if (!gps.lat || !gps.lng) return showToast('Tunggu sinyal GPS terkunci terlebih dahulu.', 'error');
+      const radius = document.getElementById('admRadiusField').value || 30;
+      if (!confirm(`Kalibrasi lokasi outlet ke titik Anda saat ini (${gps.lat}, ${gps.lng}) dengan radius ${radius}m?`)) return;
+
+      setLoading(true, 'Mengkalibrasi koordinat GPS outlet...');
+      callServer(
+        'calibrateOutletGpsAdmin',
+        {
+          sessionToken: localStorage.getItem(TOKEN_STORAGE_KEY),
+          lat: gps.lat,
+          lng: gps.lng,
+          radius: radius
+        },
+        (res) => {
+          showToast(res.message, 'success');
+          syncStateWithServer();
+        },
+        (err) => {
+          setLoading(false);
+          showToast(err.message, 'error');
+        }
+      );
+    }
+
+    function openPinModal() {
+      document.getElementById('pinModal').classList.remove('hidden');
+    }
+
+    function closePinModal() {
+      document.getElementById('pinModal').classList.add('hidden');
+    }
+
+    function submitNewPin() {
+      const oldP = document.getElementById('oldPinInput').value;
+      const newP = document.getElementById('newPinInput').value;
+      setLoading(true, 'Memperbarui PIN...');
+      callServer(
+        'changeMyPin',
+        {
+          sessionToken: localStorage.getItem(TOKEN_STORAGE_KEY),
+          oldPin: oldP,
+          newPin: newP
+        },
+        (res) => {
+          setLoading(false);
+          closePinModal();
+          document.getElementById('oldPinInput').value = '';
+          document.getElementById('newPinInput').value = '';
+          showToast(res.message, 'success');
+        },
+        (err) => {
+          setLoading(false);
+          showToast(err.message, 'error');
+        }
+      );
+    }
+
+    function tickLocalClock() {
+      if (!state || !state.serverTime) return;
+      const now = new Date();
+      const tStr = now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
+      const hr = parseInt(now.toLocaleTimeString('en-US', { timeZone: 'Asia/Jakarta', hour12: false, hour: '2-digit' }), 10);
+      const clockEl = document.getElementById('headerClock');
+      if (clockEl) clockEl.innerText = `${tStr} WIB`;
+      state.serverTime.hour = hr;
+      renderOmsetStatus();
+    }
+  </script>
+</body>
+</html>
